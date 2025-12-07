@@ -103,12 +103,14 @@ bool WytClimate::query_state_(bool read_only) {
 
   // 1. Mode (Power + Mode)
   if (new_state.power != old_state.power || new_state.mode != old_state.mode) {
+    changed = true;
     this->update_property_(this->mode, this->get_mode(), changed);
   }
 
   // 2. Fan Mode (FanSpeed + Mute + Turbo)
   if (new_state.fan_speed != old_state.fan_speed || new_state.mute != old_state.mute ||
       new_state.turbo != old_state.turbo) {
+    changed = true;
     // Standard Fan Mode
     this->update_property_(this->fan_mode, this->get_pioneer_fan_mode(), changed);
 
@@ -121,11 +123,8 @@ bool WytClimate::query_state_(bool read_only) {
       }
     } else {
       if (this->has_custom_fan_mode()) {
-        // If we currently have a custom mode but the device is now in a standard mode,
-        // we might need to clear the custom mode. However, the standard fan mode setter
-        // usually clears custom mode implicitly.
-        // We do nothing here and rely on update_property_(fan_mode) if it was set above.
-        // If both are empty, it's an edge case.
+        this->set_custom_fan_mode_({});
+        changed = true;
       }
     }
   }
@@ -133,12 +132,14 @@ bool WytClimate::query_state_(bool read_only) {
   // 3. Swing Mode (H + V Flow + LeftRight/UpDown specific flows)
   if (new_state.horizontal_flow != old_state.horizontal_flow || new_state.vertical_flow != old_state.vertical_flow ||
       new_state.left_right_flow != old_state.left_right_flow || new_state.up_down_flow != old_state.up_down_flow) {
+    changed = true;
     this->update_property_(this->swing_mode, this->get_swing_mode(), changed);
   }
 
   // 4. Target Temperature (Setpoint Whole + Half)
   if (new_state.setpoint_whole != old_state.setpoint_whole ||
       new_state.setpoint_half_digit != old_state.setpoint_half_digit) {
+    changed = true;
     this->update_property_(this->target_temperature, this->get_setpoint(), changed);
   }
 
@@ -328,10 +329,14 @@ void WytClimate::switch_to_fan_mode_(climate::ClimateFanMode fan_mode) {
 }
 
 void WytClimate::switch_to_custom_fan_mode_(std::string custom_fan_mode) {
-  if (custom_fan_mode == this->get_pioneer_custom_fan_mode()) {
-    ESP_LOGI(TAG, "Already in target custom fan mode %s", custom_fan_mode);
+  auto current_custom_fan_mode = this->get_pioneer_custom_fan_mode();
+  if (current_custom_fan_mode.has_value() && custom_fan_mode == current_custom_fan_mode.value()) {
+    ESP_LOGI(TAG, "Already in target custom fan mode %s", custom_fan_mode.c_str());
     return;
   }
+  ESP_LOGD(TAG, "Switching custom fan mode from %s to %s",
+           current_custom_fan_mode.has_value() ? current_custom_fan_mode.value().c_str() : "None",
+           custom_fan_mode.c_str());
 
   this->command.mute = false;
   this->command.turbo = false;
