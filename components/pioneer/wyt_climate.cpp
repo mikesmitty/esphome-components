@@ -328,10 +328,14 @@ void WytClimate::switch_to_fan_mode_(climate::ClimateFanMode fan_mode) {
 }
 
 void WytClimate::switch_to_custom_fan_mode_(std::string custom_fan_mode) {
-  if (custom_fan_mode == this->get_pioneer_custom_fan_mode()) {
-    ESP_LOGI(TAG, "Already in target custom fan mode %s", custom_fan_mode);
+  auto current_custom_fan_mode = this->get_pioneer_custom_fan_mode();
+  if (current_custom_fan_mode.has_value() && custom_fan_mode == current_custom_fan_mode.value()) {
+    ESP_LOGI(TAG, "Already in target custom fan mode %s", custom_fan_mode.c_str());
     return;
   }
+  ESP_LOGD(TAG, "Switching custom fan mode from %s to %s",
+           current_custom_fan_mode.has_value() ? current_custom_fan_mode.value().c_str() : "None",
+           custom_fan_mode.c_str());
 
   this->command.mute = false;
   this->command.turbo = false;
