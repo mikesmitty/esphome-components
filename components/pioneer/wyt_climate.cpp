@@ -235,8 +235,7 @@ void WytClimate::control(const climate::ClimateCall &call) {
 
 climate::ClimateTraits WytClimate::traits() {
   auto traits = climate::ClimateTraits();
-  traits.add_feature_flags(climate::ClimateSupports::CLIMATE_SUPPORTS_ACTION |
-                           climate::ClimateSupports::CLIMATE_SUPPORTS_CURRENT_TEMPERATURE);
+  traits.add_feature_flags(climate::CLIMATE_SUPPORTS_ACTION | climate::CLIMATE_SUPPORTS_CURRENT_TEMPERATURE);
 
   traits.add_supported_mode(climate::CLIMATE_MODE_AUTO);
   traits.add_supported_mode(climate::CLIMATE_MODE_COOL);
