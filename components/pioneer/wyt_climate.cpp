@@ -179,8 +179,8 @@ void WytClimate::refresh() {
   this->switch_to_action_(this->action);
   if (this->has_custom_fan_mode())
     this->switch_to_custom_fan_mode_(this->get_custom_fan_mode());
-  else
-    this->switch_to_fan_mode_(this->fan_mode);
+  else if (this->fan_mode.has_value())
+    this->switch_to_fan_mode_(this->fan_mode.value());
   this->switch_to_swing_mode_(this->swing_mode);
   this->validate_target_temperature();
   this->switch_to_setpoint_temperature_();
@@ -235,8 +235,8 @@ void WytClimate::control(const climate::ClimateCall &call) {
 
 climate::ClimateTraits WytClimate::traits() {
   auto traits = climate::ClimateTraits();
-  traits.set_supports_action(true);
-  traits.set_supports_current_temperature(true);
+  traits.add_feature_flags(climate::ClimateSupports::CLIMATE_SUPPORTS_ACTION |
+                           climate::ClimateSupports::CLIMATE_SUPPORTS_CURRENT_TEMPERATURE);
 
   traits.add_supported_mode(climate::CLIMATE_MODE_AUTO);
   traits.add_supported_mode(climate::CLIMATE_MODE_COOL);
