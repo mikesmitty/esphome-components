@@ -121,11 +121,8 @@ bool WytClimate::query_state_(bool read_only) {
       }
     } else {
       if (this->has_custom_fan_mode()) {
-        // If we currently have a custom mode but the device is now in a standard mode,
-        // we might need to clear the custom mode. However, the standard fan mode setter
-        // usually clears custom mode implicitly.
-        // We do nothing here and rely on update_property_(fan_mode) if it was set above.
-        // If both are empty, it's an edge case.
+        this->set_custom_fan_mode_({});
+        changed = true;
       }
     }
   }
