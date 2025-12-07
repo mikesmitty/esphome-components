@@ -103,12 +103,14 @@ bool WytClimate::query_state_(bool read_only) {
 
   // 1. Mode (Power + Mode)
   if (new_state.power != old_state.power || new_state.mode != old_state.mode) {
+    changed = true;
     this->update_property_(this->mode, this->get_mode(), changed);
   }
 
   // 2. Fan Mode (FanSpeed + Mute + Turbo)
   if (new_state.fan_speed != old_state.fan_speed || new_state.mute != old_state.mute ||
       new_state.turbo != old_state.turbo) {
+    changed = true;
     // Standard Fan Mode
     this->update_property_(this->fan_mode, this->get_pioneer_fan_mode(), changed);
 
@@ -130,12 +132,14 @@ bool WytClimate::query_state_(bool read_only) {
   // 3. Swing Mode (H + V Flow + LeftRight/UpDown specific flows)
   if (new_state.horizontal_flow != old_state.horizontal_flow || new_state.vertical_flow != old_state.vertical_flow ||
       new_state.left_right_flow != old_state.left_right_flow || new_state.up_down_flow != old_state.up_down_flow) {
+    changed = true;
     this->update_property_(this->swing_mode, this->get_swing_mode(), changed);
   }
 
   // 4. Target Temperature (Setpoint Whole + Half)
   if (new_state.setpoint_whole != old_state.setpoint_whole ||
       new_state.setpoint_half_digit != old_state.setpoint_half_digit) {
+    changed = true;
     this->update_property_(this->target_temperature, this->get_setpoint(), changed);
   }
 
