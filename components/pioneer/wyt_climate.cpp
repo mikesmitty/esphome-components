@@ -91,11 +91,61 @@ bool WytClimate::query_state_(bool read_only) {
     return false;
   }
 
-  this->state_ = response_from_bytes(this->raw_state_);
+  StateResponse new_state = response_from_bytes(this->raw_state_);
+  StateResponse old_state = this->state_;
+  this->state_ = new_state;
 
   bool changed{false};
+
+  // Only update control properties if the device state has actually changed.
+  // This prevents overwriting the optimistic state set by Home Assistant with
+  // the 'old' state from the device during the transition period.
+
+  // 1. Mode (Power + Mode)
+  if (new_state.power != old_state.power || new_state.mode != old_state.mode) {
+    this->update_property_(this->mode, this->get_mode(), changed);
+  }
+
+  // 2. Fan Mode (FanSpeed + Mute + Turbo)
+  if (new_state.fan_speed != old_state.fan_speed || new_state.mute != old_state.mute ||
+      new_state.turbo != old_state.turbo) {
+    // Standard Fan Mode
+    this->update_property_(this->fan_mode, this->get_pioneer_fan_mode(), changed);
+
+    // Custom Fan Mode
+    auto c_f_mode = this->get_pioneer_custom_fan_mode();
+    if (c_f_mode.has_value()) {
+      if (!this->has_custom_fan_mode() || (c_f_mode.value() != this->get_custom_fan_mode())) {
+        this->set_custom_fan_mode_(c_f_mode->c_str());
+        changed = true;
+      }
+    } else {
+      if (this->has_custom_fan_mode()) {
+        // If we currently have a custom mode but the device is now in a standard mode,
+        // we might need to clear the custom mode. However, the standard fan mode setter
+        // usually clears custom mode implicitly.
+        // We do nothing here and rely on update_property_(fan_mode) if it was set above.
+        // If both are empty, it's an edge case.
+      }
+    }
+  }
+
+  // 3. Swing Mode (H + V Flow + LeftRight/UpDown specific flows)
+  if (new_state.horizontal_flow != old_state.horizontal_flow || new_state.vertical_flow != old_state.vertical_flow ||
+      new_state.left_right_flow != old_state.left_right_flow || new_state.up_down_flow != old_state.up_down_flow) {
+    this->update_property_(this->swing_mode, this->get_swing_mode(), changed);
+  }
+
+  // 4. Target Temperature (Setpoint Whole + Half)
+  if (new_state.setpoint_whole != old_state.setpoint_whole ||
+      new_state.setpoint_half_digit != old_state.setpoint_half_digit) {
+    this->update_property_(this->target_temperature, this->get_setpoint(), changed);
+  }
+
+  // Always update Read-Only properties (Sensors)
   this->update_property_(this->action, this->get_action(), changed);
   this->update_property_(this->current_temperature, this->get_temperature(), changed);
+
   if (changed)
     this->publish_state();
 
@@ -113,32 +163,6 @@ void WytClimate::update() {
 
   // Publish updates for the ancillary sensors
   this->update_sensors_();
-
-  bool changed = false;
-  this->update_property_(this->current_temperature, this->get_temperature(), changed);
-  this->update_property_(this->target_temperature, this->get_setpoint(), changed);
-  this->update_property_(this->swing_mode, this->get_swing_mode(), changed);
-  this->update_property_(this->mode, this->get_mode(), changed);
-  this->update_property_(this->fan_mode, this->get_pioneer_fan_mode(), changed);
-
-  auto c_f_mode = this->get_pioneer_custom_fan_mode();
-  if (c_f_mode.has_value()) {
-    if (!this->has_custom_fan_mode() || (c_f_mode.value() != this->get_custom_fan_mode())) {
-      this->set_custom_fan_mode_(c_f_mode->c_str());
-      changed = true;
-    }
-  } else {
-    if (this->has_custom_fan_mode()) {
-      // If we had a custom mode but now don't, we probably switched to a standard fan mode
-      // which is handled by update_property_(fan_mode) above IF get_pioneer_fan_mode() returns a value.
-      // However, if both are empty (unlikely?), we might need to clear.
-      // Since standard fan mode setter clears custom, we rely on that.
-    }
-  }
-
-  if (changed) {
-    this->publish_state();
-  }
 }
 
 template<typename T> void WytClimate::update_property_(T &property, const T &value, bool &flag) {
