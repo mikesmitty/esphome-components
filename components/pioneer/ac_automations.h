@@ -19,24 +19,24 @@ template<typename... Ts> class RemoteTempAction : public PioneerWytActionBase<Ts
   TEMPLATABLE_VALUE(float, temperature)
   TEMPLATABLE_VALUE(bool, beeper)
 
-  void play(Ts... x) override {
+  void play(const Ts &...x) override {
     this->parent_->do_remote_temp(this->temperature_.value(x...), this->beeper_.value(x...));
   }
 };
 
 template<typename... Ts> class DisplayToggleAction : public PioneerWytActionBase<Ts...> {
  public:
-  void play(Ts... x) override { this->parent_->do_display_toggle(); }
+  void play(const Ts &...x) override { this->parent_->do_display_toggle(); }
 };
 
 template<typename... Ts> class BeeperOnAction : public PioneerWytActionBase<Ts...> {
  public:
-  void play(Ts... x) override { this->parent_->do_beeper_on(); }
+  void play(const Ts &...x) override { this->parent_->do_beeper_on(); }
 };
 
 template<typename... Ts> class BeeperOffAction : public PioneerWytActionBase<Ts...> {
  public:
-  void play(Ts... x) override { this->parent_->do_beeper_off(); }
+  void play(const Ts &...x) override { this->parent_->do_beeper_off(); }
 };
 
 }  // namespace wyt
