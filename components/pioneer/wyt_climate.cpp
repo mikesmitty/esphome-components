@@ -17,9 +17,6 @@ namespace wyt {
 static const char *const TAG = "pioneer.climate";
 
 void WytClimate::setup() {
-  this->custom_fan_mode.reset();
-  this->fan_mode.reset();
-
   if (!this->query_state_()) {
     ESP_LOGE(TAG, "Status query timed out");
     return;
@@ -28,8 +25,15 @@ void WytClimate::setup() {
   // Set the current mode
   this->mode = this->get_mode();
   this->action = this->get_action();
-  this->fan_mode = this->get_fan_mode();
-  this->custom_fan_mode = this->get_custom_fan_mode();
+
+  auto f_mode = this->get_pioneer_fan_mode();
+  auto c_f_mode = this->get_pioneer_custom_fan_mode();
+  if (f_mode.has_value()) {
+    this->set_fan_mode_(*f_mode);
+  } else if (c_f_mode.has_value()) {
+    this->set_custom_fan_mode_(c_f_mode->c_str());
+  }
+
   this->swing_mode = this->get_swing_mode();
   this->target_temperature = this->get_setpoint();
   this->current_temperature = this->get_temperature();
@@ -115,8 +119,22 @@ void WytClimate::update() {
   this->update_property_(this->target_temperature, this->get_setpoint(), changed);
   this->update_property_(this->swing_mode, this->get_swing_mode(), changed);
   this->update_property_(this->mode, this->get_mode(), changed);
-  this->update_property_(this->fan_mode, this->get_fan_mode(), changed);
-  this->update_property_(this->custom_fan_mode, this->get_custom_fan_mode(), changed);
+  this->update_property_(this->fan_mode, this->get_pioneer_fan_mode(), changed);
+
+  auto c_f_mode = this->get_pioneer_custom_fan_mode();
+  if (c_f_mode.has_value()) {
+    if (!this->has_custom_fan_mode() || (c_f_mode.value() != this->get_custom_fan_mode())) {
+      this->set_custom_fan_mode_(c_f_mode->c_str());
+      changed = true;
+    }
+  } else {
+    if (this->has_custom_fan_mode()) {
+      // If we had a custom mode but now don't, we probably switched to a standard fan mode
+      // which is handled by update_property_(fan_mode) above IF get_pioneer_fan_mode() returns a value.
+      // However, if both are empty (unlikely?), we might need to clear.
+      // Since standard fan mode setter clears custom, we rely on that.
+    }
+  }
 
   if (changed) {
     this->publish_state();
@@ -159,10 +177,10 @@ void WytClimate::refresh() {
 
   this->switch_to_mode_(this->mode);
   this->switch_to_action_(this->action);
-  if (this->fan_mode.has_value())
+  if (this->has_custom_fan_mode())
+    this->switch_to_custom_fan_mode_(this->get_custom_fan_mode());
+  else if (this->fan_mode.has_value())
     this->switch_to_fan_mode_(this->fan_mode.value());
-  else if (this->custom_fan_mode.has_value())
-    this->switch_to_custom_fan_mode_(this->custom_fan_mode.value());
   this->switch_to_swing_mode_(this->swing_mode);
   this->validate_target_temperature();
   this->switch_to_setpoint_temperature_();
@@ -199,12 +217,10 @@ void WytClimate::control(const climate::ClimateCall &call) {
   if (call.get_mode().has_value())
     this->mode = *call.get_mode();
   if (call.get_fan_mode().has_value()) {
-    this->fan_mode = *call.get_fan_mode();
-    this->custom_fan_mode.reset();
+    this->set_fan_mode_(*call.get_fan_mode());
   }
-  if (call.get_custom_fan_mode().has_value()) {
-    this->custom_fan_mode = *call.get_custom_fan_mode();
-    this->fan_mode.reset();
+  if (call.has_custom_fan_mode()) {
+    this->set_custom_fan_mode_(call.get_custom_fan_mode());
   }
   if (call.get_swing_mode().has_value())
     this->swing_mode = *call.get_swing_mode();
@@ -219,8 +235,7 @@ void WytClimate::control(const climate::ClimateCall &call) {
 
 climate::ClimateTraits WytClimate::traits() {
   auto traits = climate::ClimateTraits();
-  traits.set_supports_action(true);
-  traits.set_supports_current_temperature(true);
+  traits.add_feature_flags(climate::CLIMATE_SUPPORTS_ACTION | climate::CLIMATE_SUPPORTS_CURRENT_TEMPERATURE);
 
   traits.add_supported_mode(climate::CLIMATE_MODE_AUTO);
   traits.add_supported_mode(climate::CLIMATE_MODE_COOL);
@@ -255,7 +270,7 @@ void WytClimate::switch_to_action_(climate::ClimateAction action) {
 }
 
 void WytClimate::switch_to_fan_mode_(climate::ClimateFanMode fan_mode) {
-  if (fan_mode == this->get_fan_mode()) {
+  if (fan_mode == this->get_pioneer_fan_mode()) {
     ESP_LOGI(TAG, "Already in target fan mode %s", climate::climate_fan_mode_to_string(fan_mode));
     return;
   }
@@ -285,12 +300,11 @@ void WytClimate::switch_to_fan_mode_(climate::ClimateFanMode fan_mode) {
   }
 
   // Clear any custom fan modes, this is highlander rules
-  this->custom_fan_mode.reset();
-  this->fan_mode = fan_mode;
+  this->set_fan_mode_(fan_mode);
 }
 
 void WytClimate::switch_to_custom_fan_mode_(std::string custom_fan_mode) {
-  if (custom_fan_mode == this->get_custom_fan_mode()) {
+  if (custom_fan_mode == this->get_pioneer_custom_fan_mode()) {
     ESP_LOGI(TAG, "Already in target custom fan mode %s", custom_fan_mode);
     return;
   }
@@ -310,8 +324,7 @@ void WytClimate::switch_to_custom_fan_mode_(std::string custom_fan_mode) {
   }
 
   // Clear any fan modes, this is highlander rules
-  this->fan_mode.reset();
-  this->custom_fan_mode = custom_fan_mode;
+  this->set_custom_fan_mode_(custom_fan_mode.c_str());
 }
 
 void WytClimate::switch_to_mode_(climate::ClimateMode mode) {
@@ -557,7 +570,7 @@ climate::ClimateMode WytClimate::get_mode() {
   }
 }
 
-optional<std::string> WytClimate::get_custom_fan_mode() {
+optional<std::string> WytClimate::get_pioneer_custom_fan_mode() {
   switch (this->state_.fan_speed) {
     case FanSpeed::MediumLow:
       return optional<std::string>("Medium-Low");
@@ -571,7 +584,7 @@ optional<std::string> WytClimate::get_custom_fan_mode() {
   }
 }
 
-optional<climate::ClimateFanMode> WytClimate::get_fan_mode() {
+optional<climate::ClimateFanMode> WytClimate::get_pioneer_fan_mode() {
   switch (this->state_.fan_speed) {
     case FanSpeed::Low:
       if (this->state_.mute)
