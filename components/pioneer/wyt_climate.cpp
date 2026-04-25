@@ -37,6 +37,8 @@ void WytClimate::setup() {
   this->swing_mode = this->get_swing_mode();
   this->target_temperature = this->get_setpoint();
   this->current_temperature = this->get_temperature();
+
+  this->publish_state();
 }
 
 bool WytClimate::query_state_(bool read_only) {
