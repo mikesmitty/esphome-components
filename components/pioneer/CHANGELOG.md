@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.1](https://github.com/mikesmitty/esphome-components/compare/pioneer-v0.4.0...pioneer-v0.4.1) (2026-04-25)
+
+
+### Bug Fixes
+
+* **pioneer:** migrate custom fan modes to Climate base class setter ([7d35783](https://github.com/mikesmitty/esphome-components/commit/7d35783118b081ccc3924278748a9f701821d9ec)), closes [#8](https://github.com/mikesmitty/esphome-components/issues/8)
+
 ## [0.4.0](https://github.com/mikesmitty/esphome-components/compare/pioneer-v0.3.0...pioneer-v0.4.0) (2026-04-25)
 
 
