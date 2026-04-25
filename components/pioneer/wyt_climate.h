@@ -309,7 +309,6 @@ class WytClimate : public climate::Climate, public PollingComponent, public uart
   bool is_defrosting() const { return (this->state_.mode == Mode::Heat && !this->state_.heat_mode); }
   climate::ClimateAction get_action();
   optional<std::string> get_pioneer_custom_fan_mode();
-  optional<climate::ClimateFanMode> get_pioneer_fan_mode();
   climate::ClimateMode get_mode();
   climate::ClimateSwingMode get_swing_mode();
   float get_setpoint();
@@ -388,8 +387,7 @@ class WytClimate : public climate::Climate, public PollingComponent, public uart
   // Switch the climate device to the given climate action.
   void switch_to_action_(climate::ClimateAction action);
 
-  // Switch the climate device to the given climate fan mode.
-  void switch_to_fan_mode_(climate::ClimateFanMode fan_mode);
+  // Switch the climate device to the given custom fan mode.
   void switch_to_custom_fan_mode_(std::string custom_fan_mode);
 
   // Switch the climate device to the given climate mode.

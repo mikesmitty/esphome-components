@@ -17,7 +17,10 @@ namespace wyt {
 static const char *const TAG = "pioneer.climate";
 
 void WytClimate::setup() {
-  this->set_supported_custom_fan_modes({"Medium-Low", "Medium-High", "Turbo"});
+  // Use only custom fan modes so all speeds appear in order in the UI.
+  // Standard fan modes get tacked on first, breaking speed ordering.
+  this->set_supported_custom_fan_modes(
+      {"Auto", "Quiet", "Low", "Medium-Low", "Medium", "Medium-High", "High", "Turbo"});
 
   if (!this->query_state_()) {
     ESP_LOGE(TAG, "Status query timed out");
@@ -28,11 +31,8 @@ void WytClimate::setup() {
   this->mode = this->get_mode();
   this->action = this->get_action();
 
-  auto f_mode = this->get_pioneer_fan_mode();
   auto c_f_mode = this->get_pioneer_custom_fan_mode();
-  if (f_mode.has_value()) {
-    this->set_fan_mode_(*f_mode);
-  } else if (c_f_mode.has_value()) {
+  if (c_f_mode.has_value()) {
     this->set_custom_fan_mode_(c_f_mode->c_str());
   }
 
@@ -115,10 +115,6 @@ bool WytClimate::query_state_(bool read_only) {
   if (new_state.fan_speed != old_state.fan_speed || new_state.mute != old_state.mute ||
       new_state.turbo != old_state.turbo) {
     changed = true;
-    // Standard Fan Mode
-    this->update_property_(this->fan_mode, this->get_pioneer_fan_mode(), changed);
-
-    // Custom Fan Mode
     auto c_f_mode = this->get_pioneer_custom_fan_mode();
     if (c_f_mode.has_value()) {
       if (!this->has_custom_fan_mode() || (c_f_mode.value() != this->get_custom_fan_mode())) {
@@ -208,8 +204,6 @@ void WytClimate::refresh() {
   this->switch_to_action_(this->action);
   if (this->has_custom_fan_mode())
     this->switch_to_custom_fan_mode_(this->get_custom_fan_mode());
-  else if (this->fan_mode.has_value())
-    this->switch_to_fan_mode_(this->fan_mode.value());
   this->switch_to_swing_mode_(this->swing_mode);
   this->validate_target_temperature();
   this->switch_to_setpoint_temperature_();
@@ -245,9 +239,6 @@ void WytClimate::control(const climate::ClimateCall &call) {
 
   if (call.get_mode().has_value())
     this->mode = *call.get_mode();
-  if (call.get_fan_mode().has_value()) {
-    this->set_fan_mode_(*call.get_fan_mode());
-  }
   if (call.has_custom_fan_mode()) {
     this->set_custom_fan_mode_(call.get_custom_fan_mode());
   }
@@ -272,12 +263,6 @@ climate::ClimateTraits WytClimate::traits() {
   traits.add_supported_mode(climate::CLIMATE_MODE_FAN_ONLY);
   traits.add_supported_mode(climate::CLIMATE_MODE_HEAT);
 
-  traits.add_supported_fan_mode(climate::CLIMATE_FAN_AUTO);
-  traits.add_supported_fan_mode(climate::CLIMATE_FAN_LOW);
-  traits.add_supported_fan_mode(climate::CLIMATE_FAN_MEDIUM);
-  traits.add_supported_fan_mode(climate::CLIMATE_FAN_HIGH);
-  traits.add_supported_fan_mode(climate::CLIMATE_FAN_QUIET);
-
   traits.add_supported_swing_mode(climate::CLIMATE_SWING_BOTH);
   traits.add_supported_swing_mode(climate::CLIMATE_SWING_HORIZONTAL);
   traits.add_supported_swing_mode(climate::CLIMATE_SWING_OFF);
@@ -297,40 +282,6 @@ void WytClimate::switch_to_action_(climate::ClimateAction action) {
   this->action = this->get_action();
 }
 
-void WytClimate::switch_to_fan_mode_(climate::ClimateFanMode fan_mode) {
-  if (fan_mode == this->get_pioneer_fan_mode()) {
-    ESP_LOGI(TAG, "Already in target fan mode %s", climate::climate_fan_mode_to_string(fan_mode));
-    return;
-  }
-
-  this->command.mute = false;
-  this->command.turbo = false;
-  switch (fan_mode) {
-    case climate::CLIMATE_FAN_LOW:
-      this->command.fan_speed = CmdFanSpeed::Low;
-      break;
-    case climate::CLIMATE_FAN_MEDIUM:
-      this->command.fan_speed = CmdFanSpeed::Medium;
-      break;
-    case climate::CLIMATE_FAN_HIGH:
-      this->command.fan_speed = CmdFanSpeed::High;
-      break;
-    case climate::CLIMATE_FAN_QUIET:
-      this->command.fan_speed = CmdFanSpeed::Low;
-      this->command.mute = true;
-      break;
-    case climate::CLIMATE_FAN_AUTO:
-    default:
-      // we cannot report an invalid mode back to HA (even if it asked for one)
-      //  and must assume some valid value
-      this->command.fan_speed = CmdFanSpeed::Auto;
-      fan_mode = climate::CLIMATE_FAN_AUTO;
-  }
-
-  // Clear any custom fan modes, this is highlander rules
-  this->set_fan_mode_(fan_mode);
-}
-
 void WytClimate::switch_to_custom_fan_mode_(std::string custom_fan_mode) {
   auto current_custom_fan_mode = this->get_pioneer_custom_fan_mode();
   if (current_custom_fan_mode.has_value() && custom_fan_mode == current_custom_fan_mode.value()) {
@@ -343,19 +294,31 @@ void WytClimate::switch_to_custom_fan_mode_(std::string custom_fan_mode) {
 
   this->command.mute = false;
   this->command.turbo = false;
-  if (custom_fan_mode == "Medium-Low") {
+  if (custom_fan_mode == "Auto") {
+    this->command.fan_speed = CmdFanSpeed::Auto;
+  } else if (custom_fan_mode == "Quiet") {
+    this->command.fan_speed = CmdFanSpeed::Low;
+    this->command.mute = true;
+  } else if (custom_fan_mode == "Low") {
+    this->command.fan_speed = CmdFanSpeed::Low;
+  } else if (custom_fan_mode == "Medium-Low") {
     this->command.fan_speed = CmdFanSpeed::MediumLow;
+  } else if (custom_fan_mode == "Medium") {
+    this->command.fan_speed = CmdFanSpeed::Medium;
   } else if (custom_fan_mode == "Medium-High") {
-    command.fan_speed = CmdFanSpeed::MediumHigh;
+    this->command.fan_speed = CmdFanSpeed::MediumHigh;
+  } else if (custom_fan_mode == "High") {
+    this->command.fan_speed = CmdFanSpeed::High;
+  } else if (custom_fan_mode == "Turbo") {
+    this->command.fan_speed = CmdFanSpeed::High;
+    this->command.turbo = true;
   } else {
     // we cannot report an invalid mode back to HA (even if it asked for one)
     //  and must assume some valid value
-    command.fan_speed = CmdFanSpeed::High;
-    this->command.turbo = true;
-    custom_fan_mode = "Turbo";
+    this->command.fan_speed = CmdFanSpeed::Auto;
+    custom_fan_mode = "Auto";
   }
 
-  // Clear any fan modes, this is highlander rules
   this->set_custom_fan_mode_(custom_fan_mode.c_str());
 }
 
@@ -604,32 +567,24 @@ climate::ClimateMode WytClimate::get_mode() {
 
 optional<std::string> WytClimate::get_pioneer_custom_fan_mode() {
   switch (this->state_.fan_speed) {
+    case FanSpeed::Auto:
+      return optional<std::string>("Auto");
+    case FanSpeed::Low:
+      if (this->state_.mute)
+        return optional<std::string>("Quiet");
+      return optional<std::string>("Low");
     case FanSpeed::MediumLow:
       return optional<std::string>("Medium-Low");
+    case FanSpeed::Medium:
+      return optional<std::string>("Medium");
     case FanSpeed::MediumHigh:
       return optional<std::string>("Medium-High");
     case FanSpeed::High:
       if (this->state_.turbo)
         return optional<std::string>("Turbo");
+      return optional<std::string>("High");
     default:
       return optional<std::string>();
-  }
-}
-
-optional<climate::ClimateFanMode> WytClimate::get_pioneer_fan_mode() {
-  switch (this->state_.fan_speed) {
-    case FanSpeed::Low:
-      if (this->state_.mute)
-        return climate::CLIMATE_FAN_QUIET;
-      return climate::CLIMATE_FAN_LOW;
-    case FanSpeed::Medium:
-      return climate::CLIMATE_FAN_MEDIUM;
-    case FanSpeed::High:
-      return climate::CLIMATE_FAN_HIGH;
-    case FanSpeed::Auto:
-      return climate::CLIMATE_FAN_AUTO;
-    default:
-      return optional<climate::ClimateFanMode>();
   }
 }
 
