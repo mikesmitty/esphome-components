@@ -17,6 +17,8 @@ namespace wyt {
 static const char *const TAG = "pioneer.climate";
 
 void WytClimate::setup() {
+  this->set_supported_custom_fan_modes({"Medium-Low", "Medium-High", "Turbo"});
+
   if (!this->query_state_()) {
     ESP_LOGE(TAG, "Status query timed out");
     return;
@@ -275,7 +277,6 @@ climate::ClimateTraits WytClimate::traits() {
   traits.add_supported_fan_mode(climate::CLIMATE_FAN_MEDIUM);
   traits.add_supported_fan_mode(climate::CLIMATE_FAN_HIGH);
   traits.add_supported_fan_mode(climate::CLIMATE_FAN_QUIET);
-  traits.set_supported_custom_fan_modes({"Medium-Low", "Medium-High", "Turbo"});
 
   traits.add_supported_swing_mode(climate::CLIMATE_SWING_BOTH);
   traits.add_supported_swing_mode(climate::CLIMATE_SWING_HORIZONTAL);
