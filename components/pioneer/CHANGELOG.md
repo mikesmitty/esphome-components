@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.2](https://github.com/mikesmitty/esphome-components/compare/pioneer-v0.4.1...pioneer-v0.4.2) (2026-06-17)
+
+
+### Bug Fixes
+
+* **pioneer:** support standard fan modes alongside custom fan modes ([fb3248e](https://github.com/mikesmitty/esphome-components/commit/fb3248e8defeb34bcedceb4e5d0abb64ad986d6c))
+
 ## [0.4.1](https://github.com/mikesmitty/esphome-components/compare/pioneer-v0.4.0...pioneer-v0.4.1) (2026-04-25)
 
 
