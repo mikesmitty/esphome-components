@@ -19,6 +19,9 @@ constexpr uint32_t BIT_ZERO_SPACE_US = 350;
 constexpr unsigned int PIONEER_WYT_IR_PACKET_BIT_SIZE = 112;
 
 uint8_t PioneerWytData::calc_cs_(uint8_t checksum_offset) const {
+  if (this->type() == PIONEER_WYT_TYPE_FAN) {
+    checksum_offset = 0x0F;
+  }
   for (uint8_t i = 0; i < WYT_REMOTE_COMMAND_SIZE - 1; i++) {
     checksum_offset += this->data_[i];
   }
@@ -31,8 +34,12 @@ void PioneerWytProtocol::encode(RemoteTransmitData *dst, const PioneerWytData &d
   dst->mark(HEADER_MARK_US);
   dst->space(HEADER_SPACE_US);
   dst->mark(BIT_MARK_US);
+
+  // Prepend the start bit (which is a '1' bit)
+  dst->space(BIT_ONE_SPACE_US);
+  dst->mark(BIT_MARK_US);
+
   uint8_t checksum = 0;
-  // Fan mode messages are built different (have an offset added to their checksum calculation)
   if (data.type() == PioneerWytData::PIONEER_WYT_TYPE_FAN) {
     checksum = 0x0F;
   }
@@ -63,12 +70,22 @@ optional<PioneerWytData> PioneerWytProtocol::decode(RemoteReceiveData src) {
   if (!src.expect_mark(BIT_MARK_US)) {
     return {};
   }
+
+  // Expect and strip the start bit (which is a BIT_ONE_SPACE_US space followed by a BIT_MARK_US mark)
+  if (!src.expect_space(BIT_ONE_SPACE_US)) {
+    return {};
+  }
+  if (!src.expect_mark(BIT_MARK_US)) {
+    return {};
+  }
+
   size_t size = src.size() - src.get_index() - 1;
   if (size < PIONEER_WYT_IR_PACKET_BIT_SIZE * 2)
     return {};
   size = PIONEER_WYT_IR_PACKET_BIT_SIZE * 2;
   uint8_t checksum = 0;
   PioneerWytData out;
+  size_t idx = 0;
   while (size > 0) {
     uint8_t data = 0;
     for (uint8_t b = 0; b < 8; b++) {
@@ -82,10 +99,18 @@ optional<PioneerWytData> PioneerWytProtocol::decode(RemoteReceiveData src) {
       }
       size -= 2;
     }
-    if (size > 0) {
-      checksum += (data >> 4) + (data & 0xF);
-    } else if (checksum != data) {
-      return {};
+
+    if (idx < WYT_REMOTE_COMMAND_SIZE - 1) {
+      checksum += data;
+      out[idx++] = data;
+    } else {
+      if (out[3] == PioneerWytData::PIONEER_WYT_TYPE_FAN) {
+        checksum += 0x0F;
+      }
+      if (checksum != data) {
+        return {};
+      }
+      out[idx++] = data;
     }
   }
   return out;
