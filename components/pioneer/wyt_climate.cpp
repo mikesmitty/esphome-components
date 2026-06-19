@@ -785,6 +785,7 @@ void WytClimate::do_remote_temp(float temp_c, bool beeper) {
   IrGeneralCommand general_command = this->get_general_command_from_state();
 
   general_command.remote_temp = static_cast<uint8_t>(round(temp_c));
+  general_command.follow_me = true;
   general_command.beeper = this->enable_beeper_ || beeper;
 
   remote_base::PioneerWytData fan_data(
