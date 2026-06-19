@@ -28,8 +28,12 @@ void WytClimate::setup() {
   this->mode = this->get_mode();
   this->action = this->get_action();
 
+  auto f_mode = this->get_pioneer_fan_mode();
   auto c_f_mode = this->get_pioneer_custom_fan_mode();
-  if (c_f_mode.has_value()) {
+  if (f_mode.has_value()) {
+    this->fan_mode = f_mode.value();
+    this->set_custom_fan_mode_({});
+  } else if (c_f_mode.has_value()) {
     this->set_custom_fan_mode_(c_f_mode->c_str());
   }
 
