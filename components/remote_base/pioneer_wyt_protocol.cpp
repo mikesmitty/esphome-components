@@ -30,13 +30,9 @@ uint8_t PioneerWytData::calc_cs_(uint8_t checksum_offset) const {
 
 void PioneerWytProtocol::encode(RemoteTransmitData *dst, const PioneerWytData &data) {
   dst->set_carrier_frequency(38000);
-  dst->reserve(5 + ((data.size() + 1) * 2));
+  dst->reserve(2 + (data.size() * 8 * 2));
   dst->mark(HEADER_MARK_US);
   dst->space(HEADER_SPACE_US);
-  dst->mark(BIT_MARK_US);
-
-  // Prepend the start bit (which is a '1' bit)
-  dst->space(BIT_ONE_SPACE_US);
   dst->mark(BIT_MARK_US);
 
   uint8_t checksum = 0;
@@ -65,14 +61,6 @@ void PioneerWytProtocol::encode_byte_(RemoteTransmitData *dst, uint8_t item) {
 
 optional<PioneerWytData> PioneerWytProtocol::decode(RemoteReceiveData src) {
   if (!src.expect_item(HEADER_MARK_US, HEADER_SPACE_US)) {
-    return {};
-  }
-  if (!src.expect_mark(BIT_MARK_US)) {
-    return {};
-  }
-
-  // Expect and strip the start bit (which is a BIT_ONE_SPACE_US space followed by a BIT_MARK_US mark)
-  if (!src.expect_space(BIT_ONE_SPACE_US)) {
     return {};
   }
   if (!src.expect_mark(BIT_MARK_US)) {
