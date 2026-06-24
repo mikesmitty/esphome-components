@@ -1,9 +1,8 @@
-from esphome.core import coroutine
 from esphome import automation
+import esphome.codegen as cg
 from esphome.components import binary_sensor, climate, remote_transmitter, sensor, uart
 from esphome.components.remote_base import CONF_TRANSMITTER_ID
 import esphome.config_validation as cv
-import esphome.codegen as cg
 from esphome.const import (
     CONF_BEEPER,
     CONF_DISPLAY,
@@ -20,6 +19,7 @@ from esphome.const import (
     UNIT_CELSIUS,
     UNIT_WATT,
 )
+from esphome.core import coroutine
 
 CODEOWNERS = ["@mikesmitty"]
 DEPENDENCIES = ["climate", "uart"]
@@ -114,9 +114,11 @@ def templatize(value):
     return cv.Schema(ret)
 
 
-def register_action(name, type_, schema):
+def register_action(name, type_, schema, synchronous=True):
     validator = templatize(schema).extend(PIONEER_WYT_ACTION_BASE_SCHEMA)
-    registerer = automation.register_action(f"pioneer_wyt.{name}", type_, validator)
+    registerer = automation.register_action(
+        f"pioneer_wyt.{name}", type_, validator, synchronous=synchronous
+    )
 
     def decorator(func):
         async def new_func(config, action_id, template_arg, args):
