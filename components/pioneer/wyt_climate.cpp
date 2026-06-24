@@ -32,7 +32,7 @@ void WytClimate::setup() {
   auto c_f_mode = this->get_pioneer_custom_fan_mode();
   if (f_mode.has_value()) {
     this->fan_mode = f_mode.value();
-    this->set_custom_fan_mode_({});
+    this->clear_custom_fan_mode_();
   } else if (c_f_mode.has_value()) {
     this->set_custom_fan_mode_(c_f_mode->c_str());
   }
@@ -121,7 +121,7 @@ bool WytClimate::query_state_(bool read_only) {
     if (f_mode.has_value()) {
       this->update_property_(this->fan_mode, f_mode, changed);
       if (this->has_custom_fan_mode()) {
-        this->set_custom_fan_mode_({});
+        this->clear_custom_fan_mode_();
         changed = true;
       }
     } else if (c_f_mode.has_value()) {
@@ -131,7 +131,7 @@ bool WytClimate::query_state_(bool read_only) {
       }
     } else {
       if (this->has_custom_fan_mode()) {
-        this->set_custom_fan_mode_({});
+        this->clear_custom_fan_mode_();
         changed = true;
       }
     }
