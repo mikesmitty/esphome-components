@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.4.3](https://github.com/mikesmitty/esphome-components/compare/pioneer-v0.4.2...pioneer-v0.4.3) (2026-06-24)
+
+
+### Bug Fixes
+
+* **pioneer:** add synchronous parameter to actions ([b4827f7](https://github.com/mikesmitty/esphome-components/commit/b4827f78f22d67236e4eb70c232c943bb14f5c67))
+* **pioneer:** enable follow_me flag on IR remote temp transmission ([fe765f5](https://github.com/mikesmitty/esphome-components/commit/fe765f564503bc0e6e7068356948f109fdf1d843))
+* **pioneer:** fix startup fan mode initialization ([ba2fe8d](https://github.com/mikesmitty/esphome-components/commit/ba2fe8dbf9c174b52274b7cf07e53a5d7cb4789a))
+
 ## [0.4.2](https://github.com/mikesmitty/esphome-components/compare/pioneer-v0.4.1...pioneer-v0.4.2) (2026-06-17)
 
 
